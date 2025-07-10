@@ -5,12 +5,18 @@ from rich.syntax import Syntax
 from core.agent import CodingAgent
 from core.memory import SessionMemory
 
+try:
+    from core import __version__
+except ImportError:
+    __version__ = "1.0.0"
+
 console = Console()
 
 def main():
     console.print("Malaz - AI Coding Agent", style="bold green")
     parser = argparse.ArgumentParser(description='Malaz - AI Coding Agent')
     parser.add_argument('--project', type=str, default=os.getcwd(), help='Project directory')
+    parser.add_argument('--version', action='version', version=f'Malaz {__version__}')
     parser.add_argument('command', nargs='?', type=str, help='Direct command to execute')
     args = parser.parse_args()
 

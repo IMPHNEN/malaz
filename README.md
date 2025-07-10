@@ -3,6 +3,8 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-green.svg)](https://openai.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/IMPHNEN/malaz/workflows/Continuous%20Integration/badge.svg)](https://github.com/IMPHNEN/malaz/actions)
+[![Release](https://github.com/IMPHNEN/malaz/workflows/Build%20and%20Release/badge.svg)](https://github.com/IMPHNEN/malaz/actions)
 
 Malaz adalah AI coding assistant yang powerful, dirancang untuk membantu developer dalam berbagai tugas pengembangan software termasuk code generation, debugging, refactoring, dan project management.
 
@@ -18,19 +20,39 @@ Malaz adalah AI coding assistant yang powerful, dirancang untuk membantu develop
 - 💬 **Interactive Mode**: CLI interaktif dengan session memory
 - 🔐 **Security**: Built-in security validation untuk operasi file
 
-## 🚀 Quick Start
+## 📦 Installation
 
-### Prerequisites
+### Download Pre-built Binaries (Recommended)
 
-- Python 3.8+
-- OpenAI API Key
-- Git (optional, untuk VCS features)
+Download the latest release untuk platform Anda:
 
-### Installation
+- **Windows**: [malaz-windows-latest.zip](https://github.com/IMPHNEN/malaz/releases/latest)
+- **Linux**: [malaz-linux-latest.tar.gz](https://github.com/IMPHNEN/malaz/releases/latest)
+- **macOS**: [malaz-macos-latest.tar.gz](https://github.com/IMPHNEN/malaz/releases/latest)
+
+#### Installation Steps:
+
+**Windows:**
+1. Download `malaz-windows-*.zip`
+2. Extract archive
+3. Run `install.bat` as Administrator
+4. Restart Command Prompt/PowerShell
+5. Use: `malaz --help`
+
+**Linux/macOS:**
+1. Download file `.tar.gz` yang sesuai
+2. Extract: `tar -xzf malaz-*.tar.gz`
+3. Run: `./install.sh`
+4. Restart terminal atau run: `source ~/.bashrc`
+5. Use: `malaz --help`
+
+### Development Installation
+
+Untuk development atau jika ingin build dari source:
 
 1. **Clone repository:**
 ```bash
-git clone https://github.com/IMPHNEN/malaz
+git clone <repository-url>
 cd malaz
 ```
 
@@ -55,6 +77,24 @@ python malaz_cli.py "create a simple Python calculator"
 
 # Show help
 python malaz_cli.py --help
+```
+
+### Build dari Source
+
+Untuk build executable sendiri:
+
+```bash
+# Install build dependencies
+pip install pyinstaller
+
+# Build untuk platform saat ini
+python scripts/build.py
+
+# Build dengan clean
+python scripts/build.py --clean
+
+# Build dengan version custom
+python scripts/build.py --version "1.0.0-custom"
 ```
 
 ## 📖 Usage
@@ -202,6 +242,31 @@ malaz> /exit
 
 ## 🔧 Development
 
+### CI/CD Pipeline
+
+Project ini menggunakan GitHub Actions untuk automated testing dan releases:
+
+- **Continuous Integration**: Test otomatis pada Python 3.8-3.11 di Windows, Linux, dan macOS
+- **Security Scanning**: Automated security checks dengan bandit dan safety
+- **Code Quality**: Linting dengan flake8, formatting dengan black, type checking dengan mypy
+- **Automated Releases**: Build dan release otomatis untuk semua platform saat merge ke branch `release`
+
+### Release Process
+
+1. **Development**: Work pada branch `feature/*` atau `develop`
+2. **Testing**: CI pipeline akan run test otomatis
+3. **Release**: Merge ke branch `release` akan trigger:
+   - Build executable untuk Windows, Linux, macOS
+   - Create GitHub release dengan versioning otomatis
+   - Upload binaries sebagai release assets
+
+### Branch Strategy
+
+- `main`: Stable production code
+- `develop`: Development integration branch
+- `feature/*`: Feature development branches
+- `release`: Release trigger branch
+
 ### Adding Custom Tools
 
 Extend `ToolManager` class di `core/tool_manager.py`:
@@ -246,6 +311,11 @@ Edit `core/scaffold.py` untuk menambah template baru:
    - Pastikan semua dependencies terinstall
    - Run `pip install -r requirements.txt`
 
+4. **Executable Issues**
+   - Download ulang dari [releases page](https://github.com/IMPHNEN/malaz/releases)
+   - Pastikan executable memiliki permission yang benar
+   - Check antivirus software yang mungkin block executable
+
 ### Debug Mode
 
 Enable verbose logging:
@@ -254,6 +324,20 @@ Enable verbose logging:
 export MALAZ_DEBUG=1
 python malaz_cli.py
 ```
+
+Atau untuk pre-built executable:
+```bash
+export MALAZ_DEBUG=1
+malaz
+```
+
+## 🏗️ Build Status
+
+| Platform | Status | Latest Release |
+|----------|--------|----------------|
+| Windows  | [![Windows](https://github.com/IMPHNEN/malaz/workflows/Build%20and%20Release/badge.svg?branch=release)](https://github.com/IMPHNEN/malaz/actions) | [Download](https://github.com/IMPHNEN/malaz/releases/latest) |
+| Linux    | [![Linux](https://github.com/IMPHNEN/malaz/workflows/Build%20and%20Release/badge.svg?branch=release)](https://github.com/IMPHNEN/malaz/actions) | [Download](https://github.com/IMPHNEN/malaz/releases/latest) |
+| macOS    | [![macOS](https://github.com/IMPHNEN/malaz/workflows/Build%20and%20Release/badge.svg?branch=release)](https://github.com/IMPHNEN/malaz/actions) | [Download](https://github.com/IMPHNEN/malaz/releases/latest) |
 
 ## 🤝 Contributing
 

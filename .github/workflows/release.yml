@@ -1,0 +1,303 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ release ]
+  pull_request:
+    branches: [ release ]
+
+env:
+  PYTHON_VERSION: '3.8'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+    
+    - name: Run tests
+      run: |
+        pytest tests/ --cov=core --cov=utils --cov-report=xml
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+
+  build:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: malaz-linux
+            executable_ext: ""
+          - os: windows-latest
+            platform: windows
+            artifact_name: malaz-windows
+            executable_ext: ".exe"
+          - os: macos-latest
+            platform: macos
+            artifact_name: malaz-macos
+            executable_ext: ""
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Create version file
+      shell: bash
+      run: |
+        echo "VERSION=$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)" >> version.txt
+        echo "__version__ = '$(cat version.txt)'" > core/version.py
+    
+    - name: Build executable (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        pyinstaller --onefile \
+          --name malaz${{ matrix.executable_ext }} \
+          --add-data "core:core" \
+          --add-data "utils:utils" \
+          --add-data ".env.example:./" \
+          --hidden-import openai \
+          --hidden-import tiktoken \
+          --hidden-import rich \
+          malaz_cli.py
+    
+    - name: Build executable (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        pyinstaller --onefile `
+          --name malaz${{ matrix.executable_ext }} `
+          --add-data "core;core" `
+          --add-data "utils;utils" `
+          --add-data ".env.example;./" `
+          --hidden-import openai `
+          --hidden-import tiktoken `
+          --hidden-import rich `
+          malaz_cli.py
+    
+    - name: Create package directory
+      shell: bash
+      run: |
+        mkdir -p package
+        cp dist/malaz${{ matrix.executable_ext }} package/
+        cp .env.example package/
+        cp README.md package/
+        cp -r docs package/
+    
+    - name: Create installation script (Unix)
+      if: matrix.os != 'windows-latest'
+      shell: bash
+      run: |
+        cat > package/install.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "Installing Malaz AI Coding Agent..."
+        
+        # Create installation directory
+        INSTALL_DIR="$HOME/.local/bin"
+        mkdir -p "$INSTALL_DIR"
+        
+        # Copy executable
+        cp malaz "$INSTALL_DIR/"
+        chmod +x "$INSTALL_DIR/malaz"
+        
+        # Add to PATH if not already there
+        if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+          echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+          echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || true
+        fi
+        
+        echo "Installation complete!"
+        echo "Please restart your terminal or run: source ~/.bashrc"
+        echo "Then you can use: malaz --help"
+        EOF
+        chmod +x package/install.sh
+    
+    - name: Create installation script (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        cat > package/install.bat << 'EOF'
+        @echo off
+        echo Installing Malaz AI Coding Agent...
+        
+        set "INSTALL_DIR=%USERPROFILE%\AppData\Local\Programs\Malaz"
+        mkdir "%INSTALL_DIR%" 2>nul
+        
+        copy malaz.exe "%INSTALL_DIR%\"
+        
+        echo Adding to PATH...
+        setx PATH "%PATH%;%INSTALL_DIR%"
+        
+        echo Installation complete!
+        echo Please restart your command prompt or PowerShell
+        echo Then you can use: malaz --help
+        EOF
+    
+    - name: Create archive (Unix)
+      if: matrix.os != 'windows-latest'
+      shell: bash
+      run: |
+        cd package
+        tar -czf ../malaz-${{ matrix.platform }}-$(cat ../version.txt).tar.gz *
+    
+    - name: Create archive (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        cd package
+        7z a ../malaz-${{ matrix.platform }}-$(cat ../version.txt).zip *
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: |
+          malaz-${{ matrix.platform }}-*
+        retention-days: 7
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Generate version
+      id: version
+      run: |
+        VERSION=$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Generated version: $VERSION"
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Display structure
+      run: ls -la
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        release_name: Malaz v${{ steps.version.outputs.VERSION }}
+        body: |
+          🚀 **Malaz AI Coding Agent Release v${{ steps.version.outputs.VERSION }}**
+          
+          ## 📦 Downloads
+          
+          Choose the appropriate package for your operating system:
+          
+          - **Windows**: `malaz-windows-*.zip`
+          - **Linux**: `malaz-linux-*.tar.gz`  
+          - **macOS**: `malaz-macos-*.tar.gz`
+          
+          ## 🛠️ Installation
+          
+          ### Windows
+          1. Download `malaz-windows-*.zip`
+          2. Extract the archive
+          3. Run `install.bat` as Administrator
+          4. Restart Command Prompt/PowerShell
+          5. Use: `malaz --help`
+          
+          ### Linux/macOS
+          1. Download the appropriate `.tar.gz` file
+          2. Extract: `tar -xzf malaz-*.tar.gz`
+          3. Run: `./install.sh`
+          4. Restart terminal or run: `source ~/.bashrc`
+          5. Use: `malaz --help`
+          
+          ## ⚙️ Configuration
+          
+          1. Copy `.env.example` to `.env`
+          2. Add your OpenAI API key: `OPENAI_API_KEY=your_key_here`
+          3. Start using Malaz: `malaz`
+          
+          ## 📚 Documentation
+          
+          - [Usage Guide](https://github.com/${{ github.repository }}/blob/main/docs/USAGE.md)
+          - [API Reference](https://github.com/${{ github.repository }}/blob/main/docs/API.md)
+          
+          ## 🔧 Features
+          
+          - 🤖 AI-powered coding assistance
+          - 🛠️ 9 built-in development tools
+          - 📁 Project scaffolding with templates
+          - 🔍 Code analysis and review
+          - 🐛 Auto debugging assistance
+          - 🔄 Git integration
+          - 💬 Interactive and direct command modes
+          
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+    
+    - name: Upload Linux Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./malaz-linux/malaz-linux-${{ steps.version.outputs.VERSION }}.tar.gz
+        asset_name: malaz-linux-${{ steps.version.outputs.VERSION }}.tar.gz
+        asset_content_type: application/gzip
+    
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./malaz-windows/malaz-windows-${{ steps.version.outputs.VERSION }}.zip
+        asset_name: malaz-windows-${{ steps.version.outputs.VERSION }}.zip
+        asset_content_type: application/zip
+    
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./malaz-macos/malaz-macos-${{ steps.version.outputs.VERSION }}.tar.gz
+        asset_name: malaz-macos-${{ steps.version.outputs.VERSION }}.tar.gz
+        asset_content_type: application/gzip 
