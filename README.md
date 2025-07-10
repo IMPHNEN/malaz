@@ -30,7 +30,7 @@ Malaz adalah AI coding assistant yang powerful, dirancang untuk membantu develop
 
 1. **Clone repository:**
 ```bash
-git clone <repository-url>
+git clone https://github.com/IMPHNEN/malaz
 cd malaz
 ```
 
