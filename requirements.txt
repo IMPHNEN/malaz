@@ -1,0 +1,7 @@
+openai>=1.0.0,<2.0.0
+httpx>=0.24.0
+python-dotenv
+rich
+pygments
+watchdog
+astunparse
